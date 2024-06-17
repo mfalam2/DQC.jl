@@ -82,3 +82,9 @@ function kak_circuit(params, qubits=nothing)
     end
     return circ
 end
+
+" modifies PastaQ's runcircuit function to include possibility of adjointing the circuit "
+function run(mps, circ; cc=false)
+    circ = cc ? [adjoint(g) for g in reverse(circ)] : circ
+    return runcircuit(mps, circ)
+end

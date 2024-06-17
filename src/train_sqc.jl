@@ -5,14 +5,14 @@ Date: 6/7/2024
 functions for training static quantum circuits 
 """
 
+include("gates.jl")
+include("environments.jl")
 using Flux: train!
 using ProgressMeter
 using JLD
-include("gates.jl")
-include("environments.jl")
 
 " generates either the parameters or gates for SQC ansatz "
-function generate_sqc_ansatz(targ_mps, n_layers, data="gates")
+function generate_sqc_ansatz(targ_mps, n_layers; data="gates")
     params = rand(n_layers, length(targ_mps)-1, 15)
     if data == "gates"
         return kak_circuit(params)
@@ -69,10 +69,10 @@ function sqc_svd(targ_mps, ansatz, filename; num_sweeps=500, quiet=false)
         push!(cost_list, c)
         if !quiet
             if sweep%50 == 0
-                println(infidelities[end])
+                println(cost_list[end])
             end
         end
     end
-    save(filename, "cost_list", infidelities, "circ", circ)
-    return infidelities, circ 
+    save(filename, "cost_list", cost_list, "circ", circ)
+    return cost_list, circ 
 end

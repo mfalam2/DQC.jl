@@ -6,6 +6,7 @@ useful functions for ITensors MPS class
 """
 
 using ITensors
+import PastaQ.runcircuit
 
 " turns an MPS into a statevector "
 function mps_to_vec(mps)
@@ -59,4 +60,13 @@ function insert_zero_ket(mps, loc)
         insert!(new_mps.data, loc, new_site)
         return new_mps
     end
+end
+
+" contracts the indices of mps1 and mps2 that match and returns ITensor with all uncontracted indices "
+function contract_all(mps1, mps2)
+    tensor = mps1[1] * mps2[1] 
+    for i in 2:length(mps1) 
+        tensor = tensor * mps1[i] * mps2[i]
+    end
+    return tensor 
 end

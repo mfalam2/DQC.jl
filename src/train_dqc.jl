@@ -1,3 +1,10 @@
+"""
+train_dqc.jl
+Author: Faisal Alam
+Date: 6/7/2024
+functions for training dynamic quantum circuits 
+"""
+
 include("gates.jl")
 include("measurements.jl")
 include("environments.jl")
@@ -118,14 +125,15 @@ function optim_pre_circ(pre_circ, hilbert, meas_qubits, t_ensemble, num_sweeps=2
 end
 
 " optimizes post-measurement circuit using SVD updates "
-function optim_post_circ(post_circ, proj_mps, targ_mps, num_sweeps=2)
+function optim_post_circ(post_circ, proj_mps, targ_mps, active_qubits, num_sweeps=2)
+    post_circ = rn_layer_adjoint(post_circ, 1:length(targ_mps))
     for sweep in 1:num_sweeps
         for gate_idx in 1:length(post_circ)
             env = environment(proj_mps, targ_mps, post_circ, gate_idx)
             post_circ = svd_update(env, post_circ, gate_idx)
         end
     end
-    return post_circ
+    return rn_layer_adjoint(post_circ, active_qubits)
 end
 
 " trains a dynamic quantum circuit using svd updates "
@@ -146,9 +154,11 @@ function dqc_svd(targ_mps, ansatz, filename; num_sweeps=1500)
         proj_mps_list, meas_outcomes_list = all_samples(mps, meas_qubits; new_inds=siteinds(targ_mps))
         
         for (k,(proj_mps,post_circ)) in enumerate(zip(proj_mps_list, post_circ_list))
-            post_circ = optim_post_circ(post_circ, proj_mps, targ_mps)
-            post_circ_list[k] = optim_post_circ
+            post_circ = optim_post_circ(post_circ, proj_mps, targ_mps, active_qubits)
+            post_circ_list[k] = post_circ
         end
+        
+        t_ensemble = targ_ensemble(targ_mps, meas_qubits, hilbert, post_circ_list)
         c = dqc_cost(pre_circ, hilbert, meas_qubits, t_ensemble) 
         push!(cost_list, c)
         push!(time_list, now()-start_time)
@@ -158,6 +168,6 @@ function dqc_svd(targ_mps, ansatz, filename; num_sweeps=1500)
         end
     end
 
-    save(filename, "cost_list", cost_list, "pre_params", pre_params, "post_circ_list", post_circ_list, "time_list", time_list)
-    return cost_list, pre_circ, post_circ_list, elapsed_time
+    save(filename, "cost_list", cost_list, "pre_circ", pre_circ, "post_circ_list", post_circ_list, "time_list", time_list)
+    return cost_list, pre_circ, post_circ_list, time_list
 end

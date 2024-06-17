@@ -7,6 +7,7 @@ defines measurements on matrix product states
 
 include("mps_utils.jl")
 
+" generates all possible measurement bitstrings "
 function outcomes(meas_qubits)
     outcome_tuples = [(0,1) for site_idx in meas_qubits]
     meas_outcomes_list = [x for x in Iterators.product(outcome_tuples...)]

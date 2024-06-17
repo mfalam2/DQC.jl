@@ -9,33 +9,18 @@ include("gates.jl")
 
 " environments of one or two qubit gates "
 function environment(left_mps, right_mps, circ, i)
-    a_mps = deepcopy(left_mps)
-    b_mps = deepcopy(right_mps)
+    a_mps = run(deepcopy(left_mps), circ[1:i-1])
+    b_mps = run(deepcopy(right_mps), circ[i+1:end]; cc=true)
     
-    a_circ = [("gate_from_mat", g[2], (mat=conj.(g[3].mat),)) for g in circ[1:i-1]]
-    a_mps = runcircuit(a_mps, a_circ)
-    
-    b_circ = [dag(swapprime(gate(siteinds(b_mps),g), 0,1)) for g in reverse(circ[i+1:end])] # need to reverse later
-    b_mps = runcircuit(b_mps, b_circ)
-    
-    hilbert = siteinds(a_mps)
+    hilbert = siteinds(b_mps) 
     for loc in circ[i][2]
         ind = hilbert[loc]
-        replaceind!(a_mps[loc], ind, prime(ind))
+        replaceind!(b_mps[loc], ind, prime(ind))
     end
-    
-    env = a_mps[1] * b_mps[1] 
-    for j in 2:length(hilbert)
-        env = env * a_mps[j] * b_mps[j]
-    end
-    
-    if length(circ[i][2]) == 2
-        return reshape(permutedims(array(dag(env)),[3, 1, 4, 2]),4,4) 
-    else
-        return array(env)
-    end
+    env = contract_all(a_mps, conj.(b_mps))
+    return length(circ[i][2]) == 2 ? reshape(permutedims(array(env),[3,1,4,2]),4,4) : array(env)
 end
-    
+
 " uses environments to update gate "   
 function svd_update(env, circ, gate_idx)
     U,S,V = svd(env)
