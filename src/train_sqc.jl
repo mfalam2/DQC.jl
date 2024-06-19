@@ -54,12 +54,12 @@ function sqc_gd(targ_mps, ansatz, filename; num_sweeps=5000, eta=0.05)
 end 
 
 " training SQCs with SVD updates "
-function sqc_svd(targ_mps, ansatz, filename; num_sweeps=500, quiet=false)
+function sqc_svd(targ_mps, ansatz, filename; num_sweeps=1000, quiet=false)
     right_mps = deepcopy(targ_mps)
     left_mps = siteinds(targ_mps)
     circ = ansatz
     
-    cost_list = []
+    cost_list = [sqc_cost(circ, targ_mps)]
     @showprogress for sweep in 1:num_sweeps
         for i in 1:length(circ)
             env = environment(left_mps, right_mps, circ, i)
@@ -67,10 +67,13 @@ function sqc_svd(targ_mps, ansatz, filename; num_sweeps=500, quiet=false)
         end
         c = sqc_cost(circ, targ_mps)
         push!(cost_list, c)
-        if !quiet
-            if sweep%50 == 0
-                println(cost_list[end])
-            end
+        
+        if abs(cost_list[end] - cost_list[end-1])/cost_list[end] < 1e-5
+            break
+        end
+        
+        if !quiet && sweep%50 == 0
+            println(cost_list[end])
         end
     end
     save(filename, "cost_list", cost_list, "circ", circ)

@@ -78,6 +78,16 @@ function dqc_cost(params, hilbert, meas_qubits, targ_mps)
     return infidelity / (2^length(meas_qubits))    
 end
 
+" infidelity averaged over every measurement outcome; takes gates of kak_circuit() and rn_layer()s "
+function dqc_cost(pre_circ, post_circ_list, hilbert, meas_qubits, targ_mps) 
+    mps = runcircuit(hilbert, pre_circ)
+    t_ensemble = targ_ensemble(targ_mps, meas_qubits, hilbert, post_circ_list)
+    meas_outcomes_list = outcomes(meas_qubits)
+    renorm_list = [sqrt(probability(mps, meas_qubits, meas_outcomes)) for meas_outcomes in meas_outcomes_list]
+    infidelity = sum([1 - abs(inner(mps, t_mps)/renorm) for (t_mps, renorm) in zip(t_ensemble,renorm_list)])
+    return infidelity / (2^length(meas_qubits))    
+end
+
 " infidelity averaged over every measurement outcome; takes gates of kak_circuit() and ensemble of target states "
 function dqc_cost(pre_circ, hilbert, meas_qubits, t_ensemble)     
     mps = runcircuit(hilbert, pre_circ)
@@ -137,12 +147,12 @@ function optim_post_circ(post_circ, proj_mps, targ_mps, active_qubits, num_sweep
 end
 
 " trains a dynamic quantum circuit using svd updates "
-function dqc_svd(targ_mps, ansatz, filename; num_sweeps=1500)
+function dqc_svd(targ_mps, ansatz, filename; num_sweeps=2500, quiet=false)
     start_time = now()
     (hilbert, meas_qubits, active_qubits, pre_circ, post_circ_list) = ansatz
     
-    cost_list = []
-    time_list = []
+    cost_list = [dqc_cost(pre_circ, post_circ_list, hilbert, meas_qubits, targ_mps)]
+    time_list = [Millisecond(0)]
     @showprogress for epoch in 1:num_sweeps
         t_ensemble = targ_ensemble(targ_mps, meas_qubits, hilbert, post_circ_list)
         pre_circ = optim_pre_circ(pre_circ, hilbert, meas_qubits, t_ensemble)
@@ -163,7 +173,11 @@ function dqc_svd(targ_mps, ansatz, filename; num_sweeps=1500)
         push!(cost_list, c)
         push!(time_list, now()-start_time)
         
-        if epoch%10 == 0
+        if abs(cost_list[end] - cost_list[end-2])/cost_list[end] < 1e-5
+            break
+        end
+        
+        if !quiet && epoch%10 == 0
             println(c)
         end
     end
